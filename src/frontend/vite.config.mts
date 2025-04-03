@@ -61,5 +61,14 @@ export default defineConfig(({ mode }) => {
         ...proxyTargets,
       },
     },
+    optimizeDeps: {
+      exclude: [
+        '@radix-ui/react-popover',
+        '@radix-ui/react-select',
+        '@radix-ui/primitive',
+        '@radix-ui/react-primitive'
+      ],
+      force: true
+    },
   };
 });
