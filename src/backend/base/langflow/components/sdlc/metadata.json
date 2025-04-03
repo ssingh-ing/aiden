@@ -1,0 +1,9 @@
+{
+    "AzureDevOpsComponent": {
+        "display_name": "Azure DevOps Work Items",
+        "description": "Fetches work items from Azure DevOps using WIQL queries",
+        "documentation": "https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/wiql/query-by-wiql",
+        "category": "sdlc",
+        "icon": "GitBranch"
+    }
+} 
