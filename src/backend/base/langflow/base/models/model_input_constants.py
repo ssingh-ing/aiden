@@ -1,3 +1,5 @@
+from typing import Any, Dict, List, Optional
+
 from typing_extensions import TypedDict
 
 from langflow.base.models.model import LCModelComponent
@@ -160,112 +162,100 @@ def _get_sambanova_inputs_and_fields():
     return sambanova_inputs, create_input_fields_dict(sambanova_inputs, "")
 
 
-MODEL_PROVIDERS_DICT: dict[str, ModelProvidersDict] = {}
+def get_components_dict():
+    from langflow.components import COMPONENTS_DICT
+    return COMPONENTS_DICT
 
-# Try to add each provider
-try:
-    openai_inputs, openai_fields = _get_openai_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["OpenAI"] = {
-        "fields": openai_fields,
-        "inputs": openai_inputs,
-        "prefix": "",
-        "component_class": OpenAIModelComponent(),
-        "icon": OpenAIModelComponent.icon,
+
+def get_fields():
+    # Only import inside this function to avoid circular imports
+    from langflow.base.models.model_common import ModelType
+    # Rest of the function's logic
+
+
+# Define ALL_PROVIDER_FIELDS without importing components directly
+ALL_PROVIDER_FIELDS = [
+    "api_key",
+    "model_name",
+    "model_kwargs",
+    "max_tokens", 
+    "temperature",
+    "openai_api_base",
+    "timeout",
+    "max_retries",
+    "seed",
+    "json_mode"
+]
+
+# Other constants and configuration settings
+MODEL_DYNAMIC_UPDATE_FIELDS = [
+    "agent_llm"
+]
+
+MODEL_PROVIDERS_DICT = {
+    "OpenAI": {
+        "fields": [
+            "api_key",
+            "model_name",
+            "model_kwargs",
+            "max_tokens", 
+            "temperature",
+            "openai_api_base",
+            "timeout",
+            "max_retries",
+            "seed",
+            "json_mode"
+        ],
+        "inputs": [
+            {
+                "name": "api_key",
+                "display_name": "API Key",
+                "field_type": "str",
+                "required": True,
+                "placeholder": "sk-...",
+                "is_list": False,
+                "show": True,
+                "advanced": False
+            },
+            {
+                "name": "model_name",
+                "display_name": "Model Name",
+                "field_type": "str",
+                "required": True,
+                "value": "gpt-4",
+                "options": ["gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+                "is_list": False,
+                "show": True,
+                "advanced": False
+            },
+            {
+                "name": "temperature",
+                "display_name": "Temperature",
+                "field_type": "float",
+                "required": False,
+                "value": 0.7,
+                "is_list": False,
+                "show": True,
+                "advanced": True
+            },
+            {
+                "name": "max_tokens",
+                "display_name": "Max Tokens",
+                "field_type": "int",
+                "required": False,
+                "value": 256,
+                "is_list": False,
+                "show": True,
+                "advanced": True
+            }
+        ],
+        "component_class": None,
+        "prefix": ""
     }
-except ImportError:
-    pass
-
-try:
-    azure_inputs, azure_fields = _get_azure_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["Azure OpenAI"] = {
-        "fields": azure_fields,
-        "inputs": azure_inputs,
-        "prefix": "",
-        "component_class": AzureChatOpenAIComponent(),
-        "icon": AzureChatOpenAIComponent.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    groq_inputs, groq_fields = _get_groq_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["Groq"] = {
-        "fields": groq_fields,
-        "inputs": groq_inputs,
-        "prefix": "",
-        "component_class": GroqModel(),
-        "icon": GroqModel.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    anthropic_inputs, anthropic_fields = _get_anthropic_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["Anthropic"] = {
-        "fields": anthropic_fields,
-        "inputs": anthropic_inputs,
-        "prefix": "",
-        "component_class": AnthropicModelComponent(),
-        "icon": AnthropicModelComponent.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    nvidia_inputs, nvidia_fields = _get_nvidia_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["NVIDIA"] = {
-        "fields": nvidia_fields,
-        "inputs": nvidia_inputs,
-        "prefix": "",
-        "component_class": NVIDIAModelComponent(),
-        "icon": NVIDIAModelComponent.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    bedrock_inputs, bedrock_fields = _get_amazon_bedrock_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["Amazon Bedrock"] = {
-        "fields": bedrock_fields,
-        "inputs": bedrock_inputs,
-        "prefix": "",
-        "component_class": AmazonBedrockComponent(),
-        "icon": AmazonBedrockComponent.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    google_generative_ai_inputs, google_generative_ai_fields = _get_google_generative_ai_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["Google Generative AI"] = {
-        "fields": google_generative_ai_fields,
-        "inputs": google_generative_ai_inputs,
-        "prefix": "",
-        "component_class": GoogleGenerativeAIComponent(),
-        "icon": GoogleGenerativeAIComponent.icon,
-    }
-except ImportError:
-    pass
-
-try:
-    sambanova_inputs, sambanova_fields = _get_sambanova_inputs_and_fields()
-    MODEL_PROVIDERS_DICT["SambaNova"] = {
-        "fields": sambanova_fields,
-        "inputs": sambanova_inputs,
-        "prefix": "",
-        "component_class": SambaNovaComponent(),
-        "icon": SambaNovaComponent.icon,
-    }
-except ImportError:
-    pass
-
-MODEL_PROVIDERS = list(MODEL_PROVIDERS_DICT.keys())
-ALL_PROVIDER_FIELDS: list[str] = [field for provider in MODEL_PROVIDERS_DICT.values() for field in provider["fields"]]
-
-MODEL_DYNAMIC_UPDATE_FIELDS = ["api_key", "model", "tool_model_enabled", "base_url", "model_name"]
-
+}
 
 MODELS_METADATA = {
-    key: {"icon": MODEL_PROVIDERS_DICT[key]["icon"] if key in MODEL_PROVIDERS_DICT else None}
-    for key in MODEL_PROVIDERS_DICT
+    "OpenAI": {
+        "icon": "openai"
+    }
 }

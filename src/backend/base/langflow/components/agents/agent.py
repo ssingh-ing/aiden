@@ -1,24 +1,36 @@
 from langchain_core.tools import StructuredTool
+from typing import Any, Dict, List, Optional
 
 from langflow.base.agents.agent import LCToolsAgentComponent
 from langflow.base.agents.events import ExceptionWithMessageError
 from langflow.base.models.model_input_constants import (
-    ALL_PROVIDER_FIELDS,
     MODEL_DYNAMIC_UPDATE_FIELDS,
     MODEL_PROVIDERS_DICT,
     MODELS_METADATA,
 )
 from langflow.base.models.model_utils import get_model_name
+from langflow.base.outputs.structured_output import StructuredOutput
 from langflow.components.helpers import CurrentDateComponent
 from langflow.components.helpers.memory import MemoryComponent
 from langflow.components.langchain_utilities.tool_calling import ToolCallingAgentComponent
 from langflow.custom.custom_component.component import _get_component_toolkit
 from langflow.custom.utils import update_component_build_config
 from langflow.field_typing import Tool
-from langflow.io import BoolInput, DropdownInput, MultilineInput, Output
+from langflow.interface.input.inputs import (
+    BoolInput,
+    DropdownInput,
+    FloatInput,
+    IntInput,
+    MultilineInput,
+    SecretStrInput,
+    StrInput,
+)
+from langflow.interface.output import Output
 from langflow.logging import logger
 from langflow.schema.dotdict import dotdict
 from langflow.schema.message import Message
+from langflow.base.common.models import Document, Messages
+from langflow.base.common.typed_dicts import ModelResult
 
 
 def set_advanced_true(component_input):
@@ -160,9 +172,15 @@ class AgentComponent(ToolCallingAgentComponent):
         return component
 
     def delete_fields(self, build_config: dotdict, fields: dict | list[str]) -> None:
-        """Delete specified fields from build_config."""
-        for field in fields:
-            build_config.pop(field, None)
+        """Delete fields from build_config."""
+        if isinstance(fields, list):
+            for field in fields:
+                if field in build_config:
+                    del build_config[field]
+        elif isinstance(fields, dict):
+            for field in fields:
+                if field in build_config:
+                    del build_config[field]
 
     def update_input_types(self, build_config: dotdict) -> dotdict:
         """Update input types for all fields in build_config."""
@@ -178,21 +196,11 @@ class AgentComponent(ToolCallingAgentComponent):
         self, build_config: dotdict, field_value: str, field_name: str | None = None
     ) -> dotdict:
         # Iterate over all providers in the MODEL_PROVIDERS_DICT
-        # Existing logic for updating build_config
-        if field_name in ("agent_llm",):
-            build_config["agent_llm"]["value"] = field_value
-            provider_info = MODEL_PROVIDERS_DICT.get(field_value)
-            if provider_info:
-                component_class = provider_info.get("component_class")
-                if component_class and hasattr(component_class, "update_build_config"):
-                    # Call the component class's update_build_config method
-                    build_config = await update_component_build_config(
-                        component_class, build_config, field_value, "model_name"
-                    )
-
-            provider_configs: dict[str, tuple[dict, list[dict]]] = {
+        if field_name == "agent_llm" and field_value in MODEL_PROVIDERS_DICT:
+            # Create a map of provider -> (fields_to_add, fields_to_delete)
+            provider_configs = {
                 provider: (
-                    MODEL_PROVIDERS_DICT[provider]["fields"],
+                    MODEL_PROVIDERS_DICT[provider]["inputs"],
                     [
                         MODEL_PROVIDERS_DICT[other_provider]["fields"]
                         for other_provider in MODEL_PROVIDERS_DICT
@@ -216,6 +224,8 @@ class AgentComponent(ToolCallingAgentComponent):
                 # Reset input types for agent_llm
                 build_config["agent_llm"]["input_types"] = []
             elif field_value == "Custom":
+                # Import ALL_PROVIDER_FIELDS here to avoid circular imports
+                from langflow.base.models.model_input_constants import ALL_PROVIDER_FIELDS
                 # Delete all provider fields
                 self.delete_fields(build_config, ALL_PROVIDER_FIELDS)
                 # Update with custom component
@@ -283,3 +293,36 @@ class AgentComponent(ToolCallingAgentComponent):
         if hasattr(self, "tools_metadata"):
             tools = component_toolkit(component=self, metadata=self.tools_metadata).update_tools_metadata(tools=tools)
         return tools
+
+    def build_config(self):
+        """Build a config for the component."""
+        # Use dotdict to enable dot notation for the config
+        build_config = dotdict()
+        build_config.fields = {}
+        # Initialize fields based on model
+        field_classes = MODEL_PROVIDERS_DICT.get("agent")
+
+        if field_classes:
+            if self.description is not None:
+                build_config.description = self.description
+
+            if hasattr(self, "update_dynamic_fields"):
+                fields_types = MODEL_DYNAMIC_UPDATE_FIELDS
+                if field_classes:
+                    for field in field_classes:
+                        field_clone = field.copy() if field and isinstance(field, dict) else {}
+                        if field_clone.get("name") in fields_types:
+                            field_clone = self.update_dynamic_fields(
+                                field, self.dynamic_config.get(field["name"]) or {}
+                            )
+
+                        build_config.fields[field_clone.get("name")] = field_clone
+            else:
+                for field in field_classes:
+                    build_config.fields[field.get("name")] = field
+
+            # Import ALL_PROVIDER_FIELDS here to avoid circular imports
+            from langflow.base.models.model_input_constants import ALL_PROVIDER_FIELDS
+            self.delete_fields(build_config, ALL_PROVIDER_FIELDS)
+
+        return build_config
